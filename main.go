@@ -7,49 +7,79 @@ import (
 	"time"
 )
 
+func mschan() {
+	tick := time.NewTicker(2 * time.Second)
+	fmt.Println("start mschan")
+	for {
+		select {
+		case <-tick.C:
+			ms := runtime.AllMsSnapshot()
+			fmt.Println("===== dump ms =====")
+			for _, m := range ms {
+				fmt.Printf("memstats: %+v\n", m)
+			}
+		}
+	}
+}
+
+func pschan() {
+	tick := time.NewTicker(2 * time.Second)
+	fmt.Println("start pschan")
+	for {
+		select {
+		case <-tick.C:
+			ps := runtime.AllPsSnapshot()
+			fmt.Println("===== dump ps =====")
+			for _, p := range ps {
+				fmt.Printf("p: %+v\n", p)
+			}
+		}
+	}
+}
+
+func localchan() {
+	tick := time.NewTicker(5 * time.Second)
+	fmt.Println("start localchan")
+	for {
+		select {
+		case <-tick.C:
+			ls := runtime.LocalRunq()
+			fmt.Println("===== dump local goroutine =====")
+			for _, l := range ls {
+				fmt.Printf("local: %+v\n", l)
+			}
+		}
+	}
+}
+
+func globalchan() {
+	tick := time.NewTicker(2 * time.Second)
+	fmt.Println("start globalchan")
+	for {
+		select {
+		case <-tick.C:
+			gs := runtime.GlobalRunq()
+			fmt.Println("===== dump global goroutine =====")
+			for _, g := range gs {
+				fmt.Printf("goroutine: %+v\n", g)
+			}
+		}
+	}
+}
+
 func main() {
+	go localchan()
+	go globalchan()
+	go mschan()
+	go pschan()
+
 	var wg sync.WaitGroup
-	for range 2 {
+	for range 20 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			time.Sleep(10 * time.Second)
 		}()
 	}
-
-	fmt.Println("===== dump ms =====")
-	ms := runtime.AllMsSnapshot()
-	for i, m := range ms {
-		if i == 1 {
-			fmt.Println("break")
-			break
-		}
-		fmt.Printf("memstats: %+v\n", m)
-	}
-
-	fmt.Println("===== dump ps =====")
-	ps := runtime.AllPsSnapshot()
-	for i, p := range ps {
-		if i == 1 {
-			fmt.Println("break")
-			break
-		}
-		fmt.Printf("p: %+v\n", p)
-	}
-
-	fmt.Println("===== dump global goroutine =====")
-	gs := runtime.GlobalRunq()
-	for _, g := range gs {
-		fmt.Printf("goroutine: %+v\n", g)
-	}
-
-	fmt.Println("===== dump local goroutine =====")
-	ls := runtime.LocalRunq()
-	for _, l := range ls {
-		fmt.Printf("local: %+v\n", l)
-	}
-
-	fmt.Printf("all len:\n global gs: %v\n local gs: %v\n ms: %v\n ps: %v\n", len(gs), len(ls), len(ms), len(ps))
-
 	wg.Wait()
 }
