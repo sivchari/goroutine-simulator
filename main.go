@@ -1,29 +1,16 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/signal"
 	"runtime"
-	"sync"
 	"time"
 )
 
-func mschan() {
-	tick := time.NewTicker(2 * time.Second)
-	fmt.Println("start mschan")
-	for {
-		select {
-		case <-tick.C:
-			ms := runtime.AllMsSnapshot()
-			fmt.Println("===== dump ms =====")
-			for _, m := range ms {
-				fmt.Printf("memstats: %+v\n", m)
-			}
-		}
-	}
-}
-
-func pschan() {
-	tick := time.NewTicker(2 * time.Second)
+func pschan(ctx context.Context) {
+	tick := time.NewTicker(500 * time.Millisecond)
 	fmt.Println("start pschan")
 	for {
 		select {
@@ -31,28 +18,16 @@ func pschan() {
 			ps := runtime.AllPsSnapshot()
 			fmt.Println("===== dump ps =====")
 			for _, p := range ps {
+				fmt.Printf("m: %+v\n", p.Machine)
 				fmt.Printf("p: %+v\n", p)
 			}
+		case <-ctx.Done():
+			return
 		}
 	}
 }
 
-func localchan() {
-	tick := time.NewTicker(5 * time.Second)
-	fmt.Println("start localchan")
-	for {
-		select {
-		case <-tick.C:
-			ls := runtime.LocalRunq()
-			fmt.Println("===== dump local goroutine =====")
-			for _, l := range ls {
-				fmt.Printf("local: %+v\n", l)
-			}
-		}
-	}
-}
-
-func globalchan() {
+func globalchan(ctx context.Context) {
 	tick := time.NewTicker(2 * time.Second)
 	fmt.Println("start globalchan")
 	for {
@@ -63,23 +38,27 @@ func globalchan() {
 			for _, g := range gs {
 				fmt.Printf("goroutine: %+v\n", g)
 			}
+		case <-ctx.Done():
+			return
 		}
 	}
 }
 
 func main() {
-	go localchan()
-	go globalchan()
-	go mschan()
-	go pschan()
+	ctx := context.Background()
+	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, os.Kill)
+	defer cancel()
 
-	var wg sync.WaitGroup
-	for range 20 {
-		wg.Add(1)
+	go globalchan(ctx)
+	go pschan(ctx)
+
+	for range 1000 {
 		go func() {
-			defer wg.Done()
-			time.Sleep(10 * time.Second)
+			time.Sleep(5 * time.Second)
 		}()
 	}
-	wg.Wait()
+
+	<-ctx.Done()
+
+	println("exit main")
 }
